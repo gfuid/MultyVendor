@@ -1,0 +1,30 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "backend/\r ├── config/             # DB connection, Cloudinary config, Mailer\r ├── controllers/        # Logic handlers\r │   ├── authController.js\r │   ├── productController.js\r │   ├── storeController.js\r │   ├── orderController.js\r │   └── adminController.js\r ├── middleware/         # Auth & Role checks\r │   ├── authMiddleware.js\r │   └── roleMiddleware.js\r ├── models/             # Mongoose Schemas\r │   ├── User.js         # Unified (User + Seller fields)\r │   ├── Store.js        # Store details linked to User\r │   ├── Product.js      # Linked to Store & User\r │   └── Order.js        # Split-order logic\r ├── routes/             # API Endpoints\r │   ├── authRoutes.js\r │   ├── productRoutes.js\r │   ├── storeRoutes.js\r │   ├── orderRoutes.js\r │   └── adminRoutes.js\r ├── utils/              # Helper functions (Error handlers, tokens)\r └── server.js           # Entry point",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.9.0",
+    "compression": "^1.8.1",
+    "connect-redis": "^9.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "express-validator": "^7.3.1",
+    "helmet": "^8.1.0",
+    "imagekit": "^6.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.2.1",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "redis": "^5.10.0",
+    "winston": "^3.19.0"
+  }
+}
