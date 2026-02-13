@@ -34,4 +34,16 @@ exports.applyForStore = async (req, res) => {
     }
 };
 
-
+// Store details update karne ke liye
+exports.updateStore = async (req, res) => {
+    try {
+        const updatedStore = await Store.findOneAndUpdate(
+            { owner: req.user.id },
+            req.body,
+            { new: true }
+        );
+        res.status(200).json({ success: true, store: updatedStore });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};

@@ -23,6 +23,7 @@ import BecomeSeller from './pages/Vendor/BecomeSeller.jsx';
 import SellerDashboard from './pages/Vendor/SellerDashboard.jsx';
 import AddProduct from './pages/Vendor/AddProduct.jsx';
 import MyProducts from './pages/Vendor/MyProducts.jsx';
+import EditProduct from './pages/Vendor/EditProduct.jsx'
 
 const App = () => {
   const { user, login, logout } = useAuthStore(); // logout ko bhi destructure karlein
@@ -91,6 +92,15 @@ const App = () => {
                 element={
                   <ProtectedRoute>
                     {user?.isSeller ? <MyProducts /> : <Navigate to="/profile" />}
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/seller/edit-product/:id"
+                element={
+                  <ProtectedRoute>
+                    {user?.isSeller ? <EditProduct /> : <Navigate to="/profile" />}
                   </ProtectedRoute>
                 }
               />
