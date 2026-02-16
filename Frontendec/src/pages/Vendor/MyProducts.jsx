@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import API from '../../api/axios';
-import { Trash2, Edit, X } from 'lucide-react'; // X ko bhi import karein
+import { Trash2, Edit, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 
-// 1. Modal Component ko yahi define karein ya import karein
+// 1. Modal Component (Cloudinary Ready)
 const ProductViewModal = ({ product, onClose }) => {
     const [currentImg, setCurrentImg] = useState(0);
-    // Images ke liye root URL (bina /api ke)
-    const UPLOAD_URL = import.meta.env.VITE_UPLOAD_URL;
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -19,9 +17,9 @@ const ProductViewModal = ({ product, onClose }) => {
 
                 {/* Left: Image Slider */}
                 <div className="md:w-1/2 bg-gray-50 p-6 flex flex-col items-center justify-center border-r border-gray-100">
-                    {/* Yahan path check karein: ${UPLOAD_URL}${path} */}
                     <img
-                        src={`${UPLOAD_URL}${product.images[currentImg]}`}
+                        // FIX: Seedha Cloudinary URL use ho raha hai
+                        src={product.images[currentImg]}
                         className="max-h-[400px] w-full object-contain rounded-2xl"
                         alt={product.name}
                         onError={(e) => { e.target.src = "/default-product.png" }}
@@ -30,7 +28,7 @@ const ProductViewModal = ({ product, onClose }) => {
                         {product.images.map((img, i) => (
                             <img
                                 key={i}
-                                src={`${UPLOAD_URL}${img}`}
+                                src={img}
                                 onClick={() => setCurrentImg(i)}
                                 className={`w-16 h-16 rounded-lg cursor-pointer border-2 transition-all object-cover ${currentImg === i ? 'border-[#ff4d6d]' : 'border-transparent'}`}
                             />
@@ -58,7 +56,6 @@ const ProductViewModal = ({ product, onClose }) => {
 const MyProducts = () => {
     const [products, setProducts] = useState([]);
     const [selectedProduct, setSelectedProduct] = useState(null);
-    const UPLOAD_URL = import.meta.env.VITE_UPLOAD_URL;
 
     useEffect(() => {
         const fetchMyProducts = async () => {
@@ -101,14 +98,19 @@ const MyProducts = () => {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {products.length === 0 ? (
-                            <tr><td colSpan="5" className="p-10 text-center text-gray-400">Abhi tak koi product nahi hai.</td></tr>
+                            // FIX: Hydration error fix karne ke liye message ko <tr><td> mein rakha hai
+                            <tr>
+                                <td colSpan="5" className="p-10 text-center text-gray-400 font-bold italic">
+                                    Abhi tak koi product nahi hai.
+                                </td>
+                            </tr>
                         ) : (
                             products.map(p => (
                                 <tr key={p._id} className="hover:bg-gray-50/50 transition-colors cursor-default">
-                                    {/* Product details par click karne se modal khulega */}
                                     <td className="p-4 flex items-center gap-3 cursor-pointer group" onClick={() => setSelectedProduct(p)}>
                                         <img
-                                            src={`${UPLOAD_URL}${p.images[0]}`}
+                                            // FIX: Cloudinary URL direct use ho raha hai
+                                            src={p.images[0]}
                                             className="w-12 h-12 rounded-xl object-cover border border-gray-100 group-hover:scale-105 transition-transform"
                                             alt={p.name}
                                             onError={(e) => { e.target.src = "/default-product.png" }}
@@ -120,7 +122,6 @@ const MyProducts = () => {
                                     <td className="p-4 text-center font-bold text-[#ff4d6d]">{p.stock}</td>
                                     <td className="p-4">
                                         <div className="flex justify-center gap-2">
-                                            {/* Edit Link */}
                                             <Link to={`/seller/edit-product/${p._id}`} className="p-2 bg-pink-50 text-[#ff4d6d] rounded-lg hover:bg-[#ff4d6d] hover:text-white transition-all">
                                                 <Edit size={16} />
                                             </Link>
@@ -139,7 +140,7 @@ const MyProducts = () => {
                 </table>
             </div>
 
-            {/* Modal ko Table ke BAHAR rakhein taaki layout na toote */}
+            {/* Modal - Table ke bahar render ho raha hai taaki layout na toote */}
             {selectedProduct && (
                 <ProductViewModal
                     product={selectedProduct}

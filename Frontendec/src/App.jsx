@@ -24,6 +24,8 @@ import SellerDashboard from './pages/Vendor/SellerDashboard.jsx';
 import AddProduct from './pages/Vendor/AddProduct.jsx';
 import MyProducts from './pages/Vendor/MyProducts.jsx';
 import EditProduct from './pages/Vendor/EditProduct.jsx'
+import StoreSettings from './pages/Vendor/StoreSettings.jsx';
+
 
 const App = () => {
   const { user, login, logout } = useAuthStore(); // logout ko bhi destructure karlein
@@ -104,6 +106,12 @@ const App = () => {
                   </ProtectedRoute>
                 }
               />
+
+              <Route path="/seller/settings" element={
+                <ProtectedRoute>
+                  {user?.isSeller ? <StoreSettings /> : <Navigate to="/profile" />}
+                </ProtectedRoute>
+              } />
 
 
             </Routes>
