@@ -1,32 +1,37 @@
+/**
+ * UPLOAD MIDDLEWARE (The Logistics Manager)
+ * Purpose: Frontend se aane wali images ko validate karna aur Cloudinary storage tak pahunchana.
+ */
+
 const multer = require('multer');
-const path = require('path');
+const { storage } = require('../config/cloudinary'); // Destructure karke sirf storage engine nikalna
 
-// Storage setting
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/'); // Is folder ko manually create kar lena backend root mein
-    },
-    filename: (req, file, cb) => {
-        // Filename ko unique banana: current date + original name
-        cb(null, `${Date.now()}-${file.originalname}`);
-    }
-});
-
-// File filter (sirf images allow karne ke liye)
+// 1. FILE FILTER (Security Check)
+// Yeh function ensure karta hai ki koi malicious file (jaise .exe ya .js) upload na ho.
 const fileFilter = (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    if (extname) {
-        return cb(null, true);
+    // Check karein ki file ka type "image" se shuru hota hai ya nahi
+    if (file.mimetype.startsWith('image')) {
+        cb(null, true); // Sab sahi hai, aage badho
     } else {
-        cb(new Error('Only images (jpg, png, webp) are allowed!'));
+        // Error throw karein agar file image nahi hai
+        cb(new Error('Sirf images (jpg, png, webp) allow hain!'), false);
     }
 };
 
+// 2. MULTER CONFIGURATION
+// Yeh main upload engine hai jo hum controllers mein use karenge.
 const upload = multer({
-    storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 2MB Limit
-    fileFilter
+    storage: storage, // Humara fixed Cloudinary storage engine
+
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB Limit: Taaki server/cloud par faltu load na pade
+    },
+
+    fileFilter: fileFilter // Upar banaya gaya security filter
 });
 
+/**
+ * EXPORT:
+ * Ise routes mein use kiya jayega: upload.single('image') ya upload.array('images', 5)
+ */
 module.exports = upload;
