@@ -6,17 +6,23 @@ import CategoryBar from './CategoryBar';
 import useAuthStore from '../../store/authStore.js';
 
 const Navbar = () => {
+    // 1. All Component States
     const [placeholder, setPlaceholder] = useState("");
     const [index, setIndex] = useState(0);
     const [subIndex, setSubIndex] = useState(0);
     const [reverse, setReverse] = useState(false);
 
-    // Get auth state from your Zustand store
+    // 2. Global Auth State from Zustand
+    // FIXED: Pehle data destructure karein, phir niche variables use karein
     const { isAuthenticated, user, logout } = useAuthStore();
+
+    // 3. Dynamic Cart Count Logic
+    // User object ke andar cart.items ki length check karein
+    const cartCount = user?.cart?.items?.length || 0;
 
     const words = ["Nutrition", "Weight Loss", "Skincare", "Hair Care", "Best Sellers"];
 
-    // Typing effect for search bar
+    // 4. Typing effect for search bar
     useEffect(() => {
         if (subIndex === words[index].length + 1 && !reverse) {
             setReverse(true);
@@ -83,37 +89,40 @@ const Navbar = () => {
                 {/* Right Side Icons & Auth */}
                 <div className="flex items-center gap-6">
                     <div className="flex gap-4 text-white items-center">
-                        <Link to="/order">
+                        <Link to="/orders">
                             <div className="relative cursor-pointer hover:scale-110 transition-transform">
                                 <Truck className="w-6 h-6" />
                             </div>
                         </Link>
 
+                        {/* Cart Icon with Fixed Dynamic Badge */}
                         <Link to="/cart">
                             <div className="relative cursor-pointer hover:scale-110 transition-transform">
-                                <ShoppingCart className="w-6 h-6" />
-                                <span className="absolute -top-1 -right-1 bg-white text-[#ff4d6d] text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">0</span>
+                                <ShoppingCart className="w-6 h-6 text-white" />
+                                {cartCount > 0 && (
+                                    <span className="absolute -top-2 -right-2 bg-white text-[#ff4d6d] text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-black shadow-sm border border-[#ff4d6d] animate-in fade-in zoom-in duration-300">
+                                        {cartCount}
+                                    </span>
+                                )}
                             </div>
                         </Link>
 
                         {/* AUTHENTICATION LOGIC */}
                         {isAuthenticated ? (
                             <div className="group relative">
-                                {/* User Info Trigger */}
                                 <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition py-1">
                                     <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center border border-white/40 shadow-sm">
                                         <User className="w-5 h-5 text-white" />
                                     </div>
-                                    {/* Added text-white to make "Hi, Name" visible */}
                                     <span className="hidden lg:block text-xs font-bold uppercase tracking-wide text-white">
                                         Hi, {user?.name?.split(' ')[0] || 'User'}
                                     </span>
                                 </div>
 
-                                {/* Dropdown Menu - Added z-[110] and better positioning */}
+                                {/* Dropdown Menu */}
                                 <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-2xl py-2 text-gray-800 
-            invisible opacity-0 group-hover:visible group-hover:opacity-100 
-            transition-all duration-300 z-[110] border border-gray-100 overflow-hidden">
+                                invisible opacity-0 group-hover:visible group-hover:opacity-100 
+                                transition-all duration-300 z-[110] border border-gray-100 overflow-hidden">
 
                                     <div className="px-4 py-2 border-b border-gray-50 mb-1">
                                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">My Account</p>
@@ -134,7 +143,7 @@ const Navbar = () => {
 
                                     <button
                                         onClick={logout}
-                                        className="w-full flex items-center gap-2 px-4 py-2 text-red-500 hover:bg-red-50 transition-colors font-medium text-sm"
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-red-500 hover:bg-red-50 transition-colors font-medium text-sm text-left"
                                     >
                                         <LogOut className="w-4 h-4" /> Sign Out
                                     </button>

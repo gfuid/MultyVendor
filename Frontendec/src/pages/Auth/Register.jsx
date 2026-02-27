@@ -1,20 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Link } from 'react-router-dom';
-import { User, Mail, Lock, Store } from 'lucide-react';
-
-import API from '../../api/axios'; // Humne jo axios setup kiya tha
+import { Link, useNavigate } from 'react-router-dom';
+import { User, Mail, Lock, Store, Eye, EyeOff } from 'lucide-react';
+import API from '../../api/axios';
 import useAuthStore from '../../store/authStore.js';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
-
-
-
-
-// Validation Schema in English
+// 1. SIMPLE VALIDATION SCHEMA
 const schema = z.object({
     name: z.string().min(3, "Name must be at least 3 characters long"),
     email: z.string().email("Please enter a valid email address"),
@@ -23,34 +17,25 @@ const schema = z.object({
 });
 
 const Register = () => {
-    const { register, handleSubmit, formState: { errors } } = useForm({
-        resolver: zodResolver(schema)
-    });
-
-
-    // ... inside your Register component
+    const [showPassword, setShowPassword] = useState(false); // Eye toggle state
     const navigate = useNavigate();
     const login = useAuthStore((state) => state.login);
 
+    const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+        resolver: zodResolver(schema)
+    });
 
     const onSubmit = async (data) => {
         try {
-            // 1. API Call to Backend
             const response = await API.post('/auth/register', data);
-
-            // 2. Update Zustand Store with user data and token
-            login(response.data, response.data.token);
-
-            // 3. Success Message
+            login(response.data.user, response.data.token);
             toast.success("Account created successfully!");
-
-            // 4. Redirect to Home or Profile
             navigate('/');
         } catch (error) {
-            // Handle error from backend (e.g., "User already exists")
             toast.error(error.response?.data?.message || "Registration failed");
         }
     };
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
             <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-lg border border-pink-100">
@@ -83,15 +68,23 @@ const Register = () => {
                         {errors.email && <p className="text-red-500 text-xs mt-1 ml-1">{errors.email.message}</p>}
                     </div>
 
-                    {/* Password Field */}
+                    {/* Password Field with Eye Icon */}
                     <div className="relative">
                         <Lock className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
                         <input
-                            type="password"
+                            type={showPassword ? "text" : "password"} // Type toggle
                             {...register("password")}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#ff4d6d] transition-all"
-                            placeholder="Create Password"
+                            className="w-full pl-10 pr-12 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#ff4d6d] transition-all"
+                            placeholder="Password (Min 6 chars)"
                         />
+                        {/* Eye Toggle Button */}
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-2.5 text-gray-400 hover:text-[#ff4d6d]"
+                        >
+                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                        </button>
                         {errors.password && <p className="text-red-500 text-xs mt-1 ml-1">{errors.password.message}</p>}
                     </div>
 
@@ -110,9 +103,10 @@ const Register = () => {
 
                     <button
                         type="submit"
-                        className="w-full bg-[#ff4d6d] text-white py-3 rounded-xl font-bold hover:bg-[#ff7096] transition-all shadow-md mt-4 active:scale-95"
+                        disabled={isSubmitting}
+                        className="w-full bg-[#ff4d6d] text-white py-3 rounded-xl font-bold hover:bg-[#ff7096] transition-all shadow-md mt-4 active:scale-95 disabled:opacity-50"
                     >
-                        CREATE ACCOUNT
+                        {isSubmitting ? "CREATING..." : "CREATE ACCOUNT"}
                     </button>
                 </form>
 

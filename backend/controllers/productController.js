@@ -1,5 +1,5 @@
 const Product = require('../models/Product');
-const fs = require('fs');
+const cloudinary = require('cloudinary').v2; // Cloudinary ko import karein
 
 /**
  * ============================================================
@@ -77,21 +77,20 @@ exports.deleteProduct = async (req, res) => {
         const product = await Product.findById(req.params.id);
         if (!product) return res.status(404).json({ message: "Product nahi mila" });
 
-        // OWNERSHIP SECURITY: Ek seller dusre seller ka maal delete na kar sake!
-        // toString() zaroori hai kyunki product.seller ek ObjectId hota hai
         if (product.seller.toString() !== req.user.id) {
-            return res.status(401).json({ message: "Aap dusre ka product delete nahi kar sakte!" });
+            return res.status(401).json({ message: "Not Authorized" });
         }
 
-        // FILE CLEANUP: Agar local storage use kar rahe hain, toh storage khali karein
-        // Note: Agar Cloudinary hai, toh cloudinary.uploader.destroy() call karna chahiye
-        product.images.forEach(imagePath => {
-            const fullPath = `.${imagePath}`;
-            if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+        // CLOUDINARY CLEANUP: Cloud se images hatana
+        const deletePromises = product.images.map(url => {
+            // URL se Public ID nikalna (e.g., 'trireme/product_id')
+            const publicId = url.split('/').pop().split('.')[0];
+            return cloudinary.uploader.destroy(publicId);
         });
+        await Promise.all(deletePromises);
 
         await product.deleteOne();
-        res.status(200).json({ success: true, message: "Product Market se hata diya gaya hai." });
+        res.status(200).json({ success: true, message: "Product and Images removed!" });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -122,9 +121,13 @@ exports.getProductById = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
-        if (!product) return res.status(404).json({ message: "Product nahi mila" });
+        if (!product) return res.status(404).json({ message: "Product not get" });
 
-        // ATOMIC UPDATE: runValidators ensure karta hai ki naya data model rules follow kare
+        // ✅ Ownership Check Add Karein
+        if (product.seller.toString() !== req.user.id) {
+            return res.status(401).json({ message: "This Product is not user" });
+        }
+
         const updatedProduct = await Product.findByIdAndUpdate(
             req.params.id,
             req.body,
@@ -135,3 +138,27 @@ exports.updateProduct = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+
+// backend/controllers/productController.js
+exports.getAllProducts = async (req, res) => {
+    try {
+        // .populate('seller') se aapko vendor ka naam dikhane mein madad milegi
+        const products = await Product.find({}).populate('seller', 'businessInfo.storeName');
+        res.status(200).json(products);
+    } catch (error) {
+        res.status(500).json({ message: "Marketplace fetch error" });
+    }
+};
+
+// backend/controllers/productController.js
+exports.getProductById = async (req, res) => {
+    try {
+        const product = await Product.findById(req.params.id);
+        if (!product) return res.status(404).json({ message: "Product not get" });
+        res.status(200).json(product);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+

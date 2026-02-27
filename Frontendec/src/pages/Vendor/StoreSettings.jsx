@@ -1,187 +1,333 @@
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Store, Phone, MapPin, AlignLeft, Save, ShieldCheck, Edit3, X } from 'lucide-react';
+import {
+    Store, Phone, MapPin, Save, ShieldCheck,
+    Edit3, X, Mail, Globe, Landmark, Building2,
+    CheckCircle2, AlertCircle, Loader2, Lock
+} from 'lucide-react';
 import useAuthStore from '../../store/authStore.js';
 import API from '../../api/axios';
 import toast from 'react-hot-toast';
 
-const StoreSettings = () => {
-    const { user, login } = useAuthStore();
-    const { register, handleSubmit, setValue, formState: { errors } } = useForm();
-    const [isUpdating, setIsUpdating] = useState(false);
-    const [isEditMode, setIsEditMode] = useState(false); // Default: False (Read-only mode)
-    const [loading, setLoading] = useState(true);
+// ─── Input Field Component ────────────────────────────────────
+const Field = ({ label, icon: Icon, isEdit, error, children }) => (
+    <div className={`relative p-4 rounded-2xl border-2 transition-all duration-200
+        ${isEdit
+            ? error
+                ? 'bg-red-50/50 border-red-200'
+                : 'bg-white border-gray-200 focus-within:border-[#ff4d6d]'
+            : 'bg-gray-50 border-transparent'
+        }`}
+    >
+        <div className="flex items-center gap-2 mb-1.5">
+            <Icon size={12} className={isEdit ? 'text-[#ff4d6d]' : 'text-gray-400'} />
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{label}</p>
+            {!isEdit && <Lock size={9} className="text-gray-300 ml-auto" />}
+        </div>
+        {children}
+        {error && (
+            <p className="text-[10px] text-red-500 font-bold mt-1 flex items-center gap-1">
+                <AlertCircle size={10} /> {error}
+            </p>
+        )}
+    </div>
+);
 
+// ─── Section Header ───────────────────────────────────────────
+const SectionLabel = ({ title, subtitle }) => (
+    <div className="space-y-1">
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{title}</p>
+        <p className="text-xs text-gray-400 font-medium leading-relaxed">{subtitle}</p>
+    </div>
+);
+
+// ─── Main Component ───────────────────────────────────────────
+const StoreSettings = () => {
+    const { user } = useAuthStore();
+    const {
+        register,
+        handleSubmit,
+        setValue,
+        formState: { errors, isDirty }
+    } = useForm();
+
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
+    // ── Fetch Store Data ──────────────────────────────────────
     useEffect(() => {
-        const fetchStore = async () => {
+        const fetchStoreData = async () => {
             try {
                 const { data } = await API.get('/vendor/settings');
-                // Form fields ko database ke data se bharein
-                setValue('storeName', data.storeName);
-                setValue('contactPhone', data.phone);
-                setValue('storeAddress', data.address);
-                setValue('storeDescription', data.description || "");
-                setLoading(false);
+                const store = data.store;
+
+                setValue('storeName', store.businessInfo?.storeName);
+                setValue('category', store.businessInfo?.category);
+                setValue('storeDescription', store.businessInfo?.description);
+                setValue('supportEmail', store.businessInfo?.supportEmail);
+                setValue('contactPhone', store.bankingInfo?.phone);
+                setValue('storeAddress', store.bankingInfo?.pickupAddress);
+                setValue('bankName', store.bankingInfo?.bankName);
             } catch (err) {
-                toast.error("Store data load nahi hua");
+                toast.error('Store data load nahi hua!');
+            } finally {
                 setLoading(false);
             }
         };
-        fetchStore();
+        fetchStoreData();
     }, [setValue]);
 
-    const onSubmit = async (data) => {
+    // ── Submit ────────────────────────────────────────────────
+    const onSubmit = async (formData) => {
         setIsUpdating(true);
-        const toastId = toast.loading("Updating your store profile...");
+        const toastId = toast.loading('Saving changes...');
         try {
-            const response = await API.put('/vendor/update-store', data);
-
-            // Agar response success hai toh edit mode band karein
-            if (response.data.success) {
-                toast.success("Store updated successfully!", { id: toastId });
+            const { data } = await API.put('/vendor/update-store', formData);
+            if (data.success) {
+                toast.success('Store updated successfully!', { id: toastId });
                 setIsEditMode(false);
-
-                // Page ko refresh karein taaki naya data dikhe
-                window.location.reload();
+                setSaveSuccess(true);
+                setTimeout(() => setSaveSuccess(false), 3000);
             }
         } catch (error) {
-            // Isse aapko asli error message dikhega jo backend bhej raha hai
-            toast.error(error.response?.data?.message || "Internal Server Error", { id: toastId });
+            toast.error(error.response?.data?.message || 'Update failed!', { id: toastId });
         } finally {
             setIsUpdating(false);
         }
     };
-    if (loading) return <div className="p-20 text-center font-black animate-pulse">LOADING PROFILE...</div>;
+
+    const handleCancelEdit = () => {
+        setIsEditMode(false);
+    };
+
+    // ── Loading ───────────────────────────────────────────────
+    if (loading) return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center space-y-3">
+                <div className="w-10 h-10 border-4 border-[#ff4d6d] border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Loading Store Profile...</p>
+            </div>
+        </div>
+    );
 
     return (
-        <div className="p-8 bg-gray-50 min-h-screen">
-            <div className="max-w-3xl mx-auto bg-white rounded-[40px] shadow-sm border border-gray-100 p-10">
+        <div className="p-4 md:p-8 bg-[#f8f8f8] min-h-screen mt-16">
+            <div className="max-w-4xl mx-auto space-y-5">
 
-                {/* Header Section with Side Edit Button */}
-                <header className="mb-10 flex items-center justify-between border-b border-gray-50 pb-6">
+                {/* ── PAGE HEADER ──────────────────────────────── */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-black text-gray-900 italic uppercase tracking-tighter flex items-center gap-3">
-                            <Store className="text-[#ff4d6d]" size={32} /> Store Profile
+                        <h1 className="text-3xl font-black uppercase italic tracking-tighter text-gray-900 flex items-center gap-3">
+                            <Store className="text-[#ff4d6d]" size={28} />
+                            Store Settings
                         </h1>
-                        <p className="text-gray-500 font-medium italic">Your public business identity</p>
+                        <p className="text-gray-400 font-bold text-xs uppercase tracking-widest mt-1">
+                            Manage your store identity & business info
+                        </p>
                     </div>
 
-                    {/* Toggle Button */}
-                    {!isEditMode ? (
-                        <button
-                            onClick={() => setIsEditMode(true)}
-                            className="flex items-center gap-2 bg-pink-50 text-[#ff4d6d] px-6 py-3 rounded-2xl font-bold hover:bg-[#ff4d6d] hover:text-white transition-all shadow-sm"
-                        >
-                            <Edit3 size={18} /> Edit Profile
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => setIsEditMode(false)}
-                            className="flex items-center gap-2 bg-gray-100 text-gray-500 px-6 py-3 rounded-2xl font-bold hover:bg-gray-200 transition-all"
-                        >
-                            <X size={18} /> Cancel
-                        </button>
-                    )}
-                </header>
+                    {/* Edit / Cancel Toggle */}
+                    <button
+                        onClick={() => isEditMode ? handleCancelEdit() : setIsEditMode(true)}
+                        className={`self-start md:self-auto flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all
+                            ${isEditMode
+                                ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                                : 'bg-gray-900 text-white hover:bg-[#ff4d6d] shadow-lg'
+                            }`}
+                    >
+                        {isEditMode ? <><X size={15} /> Cancel</> : <><Edit3 size={15} /> Edit Profile</>}
+                    </button>
+                </div>
 
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
-                    <div className="space-y-8">
-                        {/* Section Label */}
-                        <div className="flex items-center justify-between">
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest">General Information</label>
-                            <div className="bg-green-50 text-green-600 px-3 py-1 rounded-full flex items-center gap-2 text-[10px] font-bold">
-                                <ShieldCheck size={12} /> VERIFIED SELLER
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                            {/* Shop Name Display/Input */}
-                            <div className="space-y-3">
-                                <p className="text-xs font-black text-gray-400 uppercase">Shop Name</p>
-                                {isEditMode ? (
-                                    <div className="relative group">
-                                        <Store className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-[#ff4d6d]" size={20} />
-                                        <input
-                                            {...register("storeName", { required: "Required" })}
-                                            className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:border-[#ff4d6d] outline-none transition-all font-bold text-gray-800 shadow-inner"
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-3 text-2xl font-black text-gray-900 tracking-tighter italic">
-                                        {user?.storeName || "Not Set"}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Official Contact Display/Input */}
-                            <div className="space-y-3">
-                                <p className="text-xs font-black text-gray-400 uppercase">Official Contact</p>
-                                {isEditMode ? (
-                                    <div className="relative group">
-                                        <Phone className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-[#ff4d6d]" size={20} />
-                                        <input
-                                            {...register("contactPhone", { required: "Required" })}
-                                            className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:border-[#ff4d6d] outline-none transition-all font-bold text-gray-800 shadow-inner"
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="text-xl font-bold text-gray-700 flex items-center gap-2">
-                                        <Phone size={18} className="text-[#ff4d6d]" /> {user?.contactPhone || "No contact info"}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                {/* ── SUCCESS BANNER ───────────────────────────── */}
+                {saveSuccess && (
+                    <div className="flex items-center gap-3 bg-green-50 border border-green-200 text-green-700 px-5 py-4 rounded-2xl font-bold text-sm">
+                        <CheckCircle2 size={18} />
+                        Store profile updated successfully!
                     </div>
+                )}
 
-                    {/* Address Section */}
-                    <div className="space-y-4">
-                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Logistics & Location</p>
-                        {isEditMode ? (
-                            <div className="relative group">
-                                <MapPin className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-[#ff4d6d]" size={20} />
-                                <input
-                                    {...register("storeAddress")}
-                                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:border-[#ff4d6d] outline-none transition-all font-bold text-gray-800 shadow-inner"
-                                />
-                            </div>
-                        ) : (
-                            <div className="bg-gray-50 p-5 rounded-[24px] border border-gray-100 flex items-start gap-4">
-                                <MapPin size={20} className="text-[#ff4d6d] mt-1" />
-                                <p className="text-gray-700 font-bold text-lg">{user?.storeAddress || "Please add your store address"}</p>
-                            </div>
-                        )}
+                {/* ── EDIT MODE BANNER ─────────────────────────── */}
+                {isEditMode && (
+                    <div className="flex items-center gap-3 bg-pink-50 border border-pink-100 text-[#ff4d6d] px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-widest">
+                        <Edit3 size={14} />
+                        Edit mode active — make your changes and save
                     </div>
+                )}
 
-                    {/* Description Section */}
-                    <div className="space-y-4">
-                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Brand Narrative</p>
-                        {isEditMode ? (
-                            <div className="relative group">
-                                <AlignLeft className="absolute left-4 top-4 text-gray-400 group-focus-within:text-[#ff4d6d]" size={20} />
-                                <textarea
-                                    {...register("storeDescription")}
-                                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:bg-white focus:border-[#ff4d6d] outline-none transition-all font-medium text-gray-600 h-40 shadow-inner"
-                                    placeholder="Describe your brand..."
-                                />
-                            </div>
-                        ) : (
-                            <div className="p-6 bg-pink-50/30 rounded-[30px] border-2 border-dashed border-pink-100">
-                                <p className="text-gray-600 font-medium italic leading-relaxed text-lg">
-                                    "{user?.storeDescription || "Add a catchy description to attract more customers to your shop..."}"
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+
+                    {/* ── CARD 1: STORE IDENTITY ───────────────── */}
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
+                            <div>
+                                <h2 className="font-black text-gray-900 uppercase italic tracking-tighter">
+                                    Business Identity
+                                </h2>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
+                                    Core branding & contact info
                                 </p>
                             </div>
-                        )}
+                            {user?.isVerified && (
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 rounded-full text-[10px] font-black border border-green-100">
+                                    <ShieldCheck size={12} />
+                                    Verified Vendor
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Field label="Store Name" icon={Store} isEdit={isEditMode} error={errors.storeName?.message}>
+                                <input
+                                    {...register('storeName', { required: 'Store name required' })}
+                                    disabled={!isEditMode}
+                                    placeholder="Your store name"
+                                    className="w-full bg-transparent font-bold text-gray-800 text-sm outline-none placeholder:text-gray-300 disabled:cursor-default"
+                                />
+                            </Field>
+
+                            <Field label="Category / Niche" icon={Globe} isEdit={isEditMode}>
+                                <input
+                                    {...register('category')}
+                                    disabled={!isEditMode}
+                                    placeholder="e.g. Kids Fashion"
+                                    className="w-full bg-transparent font-bold text-gray-800 text-sm outline-none placeholder:text-gray-300 disabled:cursor-default"
+                                />
+                            </Field>
+
+                            <Field label="Support Email" icon={Mail} isEdit={isEditMode} error={errors.supportEmail?.message}>
+                                <input
+                                    {...register('supportEmail', {
+                                        pattern: {
+                                            value: /^\S+@\S+$/i,
+                                            message: 'Valid email enter karo'
+                                        }
+                                    })}
+                                    disabled={!isEditMode}
+                                    placeholder="support@yourstore.com"
+                                    className="w-full bg-transparent font-bold text-gray-800 text-sm outline-none placeholder:text-gray-300 disabled:cursor-default"
+                                />
+                            </Field>
+
+                            <Field label="Contact Phone" icon={Phone} isEdit={isEditMode} error={errors.contactPhone?.message}>
+                                <input
+                                    {...register('contactPhone', {
+                                        pattern: {
+                                            value: /^[0-9]{10}$/,
+                                            message: '10-digit number enter karo'
+                                        }
+                                    })}
+                                    disabled={!isEditMode}
+                                    placeholder="10-digit mobile number"
+                                    className="w-full bg-transparent font-bold text-gray-800 text-sm outline-none placeholder:text-gray-300 disabled:cursor-default"
+                                />
+                            </Field>
+                        </div>
                     </div>
 
-                    {/* Submit Button (Only shows in Edit Mode) */}
+                    {/* ── CARD 2: STORE DESCRIPTION ────────────── */}
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="px-6 py-5 border-b border-gray-50">
+                            <h2 className="font-black text-gray-900 uppercase italic tracking-tighter">
+                                Store Description
+                            </h2>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
+                                Shown publicly on your store page
+                            </p>
+                        </div>
+                        <div className="p-6">
+                            <textarea
+                                {...register('storeDescription')}
+                                disabled={!isEditMode}
+                                rows={4}
+                                placeholder="Tell customers what your store is about..."
+                                className={`w-full p-4 rounded-2xl border-2 font-medium text-sm text-gray-700 resize-none transition-all outline-none
+                                    ${isEditMode
+                                        ? 'bg-white border-gray-200 focus:border-[#ff4d6d] placeholder:text-gray-300'
+                                        : 'bg-gray-50 border-transparent text-gray-600 cursor-default'
+                                    }`}
+                            />
+                        </div>
+                    </div>
+
+                    {/* ── CARD 3: LOGISTICS & BANKING ──────────── */}
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="px-6 py-5 border-b border-gray-50">
+                            <h2 className="font-black text-gray-900 uppercase italic tracking-tighter">
+                                Operations & Banking
+                            </h2>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
+                                Pickup address and payout details
+                            </p>
+                        </div>
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Field label="Pickup Address" icon={MapPin} isEdit={isEditMode}>
+                                <input
+                                    {...register('storeAddress')}
+                                    disabled={!isEditMode}
+                                    placeholder="Full pickup address"
+                                    className="w-full bg-transparent font-bold text-gray-800 text-sm outline-none placeholder:text-gray-300 disabled:cursor-default"
+                                />
+                            </Field>
+
+                            <Field label="Banking Partner" icon={Landmark} isEdit={isEditMode}>
+                                <input
+                                    {...register('bankName')}
+                                    disabled={!isEditMode}
+                                    placeholder="Bank name"
+                                    className="w-full bg-transparent font-bold text-gray-800 text-sm outline-none placeholder:text-gray-300 disabled:cursor-default"
+                                />
+                            </Field>
+                        </div>
+                    </div>
+
+                    {/* ── CARD 4: STORE ID INFO (Read Only) ────── */}
+                    <div className="bg-gray-900 rounded-3xl p-6 text-white">
+                        <div className="flex items-center gap-3 mb-4">
+                            <Building2 size={18} className="text-gray-400" />
+                            <h2 className="font-black uppercase italic tracking-tighter text-sm">
+                                Account Info
+                            </h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {[
+                                { label: 'Seller ID', value: user?._id?.slice(-10) || '—' },
+                                { label: 'Account', value: user?.email || '—' },
+                                { label: 'Role', value: user?.role?.toUpperCase() || 'SELLER' },
+                            ].map((item) => (
+                                <div key={item.label} className="bg-white/5 rounded-2xl px-4 py-3">
+                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">
+                                        {item.label}
+                                    </p>
+                                    <p className="font-black text-white text-sm truncate">{item.value}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* ── SAVE BUTTON ───────────────────────────── */}
                     {isEditMode && (
-                        <button
-                            type="submit"
-                            disabled={isUpdating}
-                            className="w-full bg-[#ff4d6d] text-white py-5 rounded-[24px] font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl shadow-pink-100 hover:bg-[#ff7096] transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
-                        >
-                            <Save size={24} /> {isUpdating ? "UPDATING BIZ PROFILE..." : "CONFIRM & SAVE DETAILS"}
-                        </button>
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={handleCancelEdit}
+                                className="flex-1 md:flex-none px-8 py-4 bg-white border-2 border-gray-200 text-gray-600 rounded-2xl font-black text-xs uppercase tracking-wider hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isUpdating}
+                                className="flex-1 bg-[#ff4d6d] hover:bg-[#e0344f] disabled:opacity-60 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-lg shadow-pink-200"
+                            >
+                                {isUpdating
+                                    ? <><Loader2 size={16} className="animate-spin" /> Saving...</>
+                                    : <><Save size={16} /> Save Changes</>
+                                }
+                            </button>
+                        </div>
                     )}
                 </form>
             </div>

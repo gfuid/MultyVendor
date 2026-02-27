@@ -1,8 +1,10 @@
 import { configureStore } from '@reduxjs/toolkit';
-import vendorReducer from './slices/vendorSlice';
+import authReducer from './slices/authSlice';
+import adminReducer from './slices/adminSlice'; // Check this import
 
 export const store = configureStore({
     reducer: {
-        vendors: vendorReducer, // Yahan hum vendors ka data manage karenge
+        auth: authReducer,
+        admin: adminReducer, // MUST BE HERE
     },
 });

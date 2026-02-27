@@ -20,28 +20,15 @@ const clearAdminCache = async (key) => {
  * ============================================================
  * @desc Saare registered sellers ki list nikalna (With Redis Optimization)
  */
+// controllers/adminController.js
+
 const getAllVendors = async (req, res) => {
     try {
-        const cacheKey = 'admin:vendors';
-
-        // 1. CACHE CHECK: MongoDB tak jaane se pehle Redis se pucho
-        const cachedVendors = await redisClient.get(cacheKey);
-        if (cachedVendors) {
-            console.log("⚡ Serving Vendors from Redis Cloud");
-            return res.status(200).json(JSON.parse(cachedVendors));
-        }
-
-        // 2. DB QUERY: Agar cache khali hai, toh MongoDB se search karo
-        // Password field ko security ke liye select nahi kar rahe
-        const vendors = await User.find({ isSeller: true }).select('-password');
-
-        // 3. CACHE SET: Agle 30 minutes (1800s) ke liye data store kar lo
-        await redisClient.setEx(cacheKey, 1800, JSON.stringify(vendors));
-
+        // 'Store' collection se data fetch karein aur owner ki details join karein
+        const vendors = await Store.find().populate('owner', 'name email');
         res.status(200).json(vendors);
     } catch (error) {
-        // Error ke case mein khali array bhej rahe hain taaki frontend crash na ho
-        res.status(500).json([]);
+        res.status(500).json({ message: "Failed to fetch vendors" });
     }
 };
 
@@ -54,23 +41,22 @@ const getAllVendors = async (req, res) => {
 const updateVendorStatus = async (req, res) => {
     try {
         const { isApproved } = req.body;
-        const vendor = await User.findById(req.params.id);
+        // 1. User ko suspend/approve karein
+        const user = await User.findByIdAndUpdate(req.params.id, {
+            isApproved,
+            sellerStatus: isApproved ? 'approved' : 'rejected'
+        }, { new: true });
 
-        if (!vendor) return res.status(404).json({ message: "Vendor nahi mila" });
+        // 2. Store ko suspend/approve karein (Asli fix yahan hai)
+        await Store.findOneAndUpdate(
+            { owner: req.params.id },
+            { status: isApproved ? 'approved' : 'rejected' }
+        );
 
-        // Status update karna
-        vendor.isApproved = isApproved;
-        await vendor.save();
-
-        // ⚠️ INVALIDATION: Vendor list ab purani ho chuki hai, isliye cache delete karein
         await clearAdminCache('admin:vendors');
-
-        res.status(200).json({
-            message: `Vendor ${isApproved ? 'Approve' : 'Suspend'} kar diya gaya hai`,
-            vendor
-        });
+        res.status(200).json({ success: true, message: "Status Synced!" });
     } catch (error) {
-        res.status(500).json({ message: "Status update fail", error: error.message });
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -83,22 +69,23 @@ const updateVendorStatus = async (req, res) => {
 const getAllProductsAdmin = async (req, res) => {
     try {
         const cacheKey = 'admin:products';
-
-        // REDIS LOOKUP: System ki speed badhane ke liye
         const cachedProducts = await redisClient.get(cacheKey);
+
+        // Cache mein bhi success object bhejien
         if (cachedProducts) {
-            return res.status(200).json(JSON.parse(cachedProducts));
+            return res.status(200).json({ success: true, products: JSON.parse(cachedProducts) });
         }
 
-        // POPULATE: Vendor ki details (Name, Email) bhi saath mein fetch karna
-        const products = await Product.find({}).populate('vendor', 'name email storeName');
+        // 'seller' populate karna zaroori hai details page ke liye
+        const products = await Product.find({}).populate('seller', 'name email');
 
-        // CACHE FILL: 30 minutes tak ke liye result store karna
         await redisClient.setEx(cacheKey, 1800, JSON.stringify(products));
 
-        res.status(200).json(products);
+        // Frontend expects: { success: true, products: [...] }
+        res.status(200).json({ success: true, products });
     } catch (error) {
-        res.status(500).json({ message: "Products fetch nahi ho paye", error: error.message });
+        console.error(error);
+        res.status(500).json({ success: false, message: "Products fetch error" });
     }
 };
 
@@ -158,10 +145,74 @@ const approveStore = async (req, res) => {
     }
 };
 
+
+/**
+ * GET DASHBOARD STATS
+ * Purpose: Aggregates real data from Users, Stores, and Products collections.
+ */
+const getDashboardStats = async (req, res) => {
+    try {
+        const totalVendors = await Store.countDocuments({ status: 'approved' });
+        const pendingApprovals = await Store.countDocuments({ status: 'pending' });
+        const totalCustomers = await User.countDocuments({ role: 'user' });
+
+        // Product analytics
+        const totalProducts = await Product.countDocuments();
+
+        res.status(200).json({
+            totalVendors,
+            pendingApprovals,
+            totalCustomers,
+            totalProducts,
+            totalRevenue: "₹0" // Sales logic integrate hone par update hoga
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Stats fetch fail ho gaye" });
+    }
+};
+
+// Admin Controller
+const getAllUsers = async (req, res) => {
+    try {
+        const users = await User.find({});
+        res.status(200).json({ success: true, users }); // "users" key zaroori hai
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+
+// Admin Controller: Delete User
+const deleteUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Check karein ki admin khud ko delete na kar le (Safety Check)
+        if (req.user.id === id) {
+            return res.status(400).json({ message: "Aap khud ko delete nahi kar sakte!" });
+        }
+
+        const user = await User.findByIdAndDelete(id);
+
+        if (!user) {
+            return res.status(404).json({ message: "User nahi mila" });
+        }
+
+        res.status(200).json({ success: true, message: "User permanently deleteled" });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+
+
 module.exports = {
     getAllVendors,
     updateVendorStatus,
     getAllProductsAdmin,
     adminDeleteProduct,
-    approveStore
+    approveStore,
+    getDashboardStats,
+    getAllUsers,
+    deleteUser
 };

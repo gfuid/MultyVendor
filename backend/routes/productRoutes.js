@@ -23,4 +23,8 @@ router.delete('/:id', protect, productController.deleteProduct);
 // 5. UPDATE PRODUCT: Details edit karne ke liye
 router.put('/:id', protect, productController.updateProduct);
 
+// backend/routes/productRoutes.js
+// Bina 'protect' ke taaki normal users bhi dekh sakein
+router.get('/', productController.getAllProducts);
+
 module.exports = router;

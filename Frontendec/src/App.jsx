@@ -12,11 +12,15 @@ import API from './api/axios';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
 // add the user Components
-import Orders from './pages/User/Orders';
 import Profile from './pages/User/Profile.jsx';
+// Add this line with your other imports
+import ProductDetail from './pages/User/ProductDetail.jsx';
+
 
 // add the Shops components
-import Cart from './pages/Shop/Cart';
+import CartPage from './pages/Shop/CartPage.jsx';
+import MyOrders from './pages/Shop/MyOrders.jsx';
+import Checkout from './pages/Shop/Checkout';
 
 // add the vendors components
 import BecomeSeller from './pages/Vendor/BecomeSeller.jsx';
@@ -25,6 +29,7 @@ import AddProduct from './pages/Vendor/AddProduct.jsx';
 import MyProducts from './pages/Vendor/MyProducts.jsx';
 import EditProduct from './pages/Vendor/EditProduct.jsx'
 import StoreSettings from './pages/Vendor/StoreSettings.jsx';
+import SellerOrders from './pages/Vendor/SellerOrders.jsx'
 
 
 const App = () => {
@@ -36,15 +41,22 @@ const App = () => {
       if (!token) return;
 
       try {
-        const response = await API.get('/auth/me');
-        login(response.data.user, token);
+        const response = await API.get('/users/me');
+        // Sirf tabhi login update karein agar data sahi mila ho
+        if (response.data && response.data.user) {
+          login(response.data.user, token);
+        }
       } catch (err) {
-        console.error("Session expired");
-        logout();
+        console.error("Auth verification failed:", err);
+        // Sirf tab logout karein agar backend kahe ki token expire ho gaya hai (401 error)
+        if (err.response && err.response.status === 401) {
+          logout();
+        }
       }
     };
     initAuth();
-  }, [login, logout]);
+  }, []);
+
 
   return (
     <>
@@ -58,8 +70,8 @@ const App = () => {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/order" element={<Orders />} />
+              <Route path="/cart" element={<CartPage />} />
+              <Route path="/orders" element={<MyOrders />} />
 
               {/* Protected User Routes */}
               <Route path="/profile" element={
@@ -111,7 +123,19 @@ const App = () => {
                 <ProtectedRoute>
                   {user?.isSeller ? <StoreSettings /> : <Navigate to="/profile" />}
                 </ProtectedRoute>
+              }
+
+              />
+              <Route path="/checkout" element={
+                <ProtectedRoute><Checkout /></ProtectedRoute>
               } />
+
+              <Route path="/seller/orders" element={
+                <ProtectedRoute><SellerOrders /></ProtectedRoute>
+              } />
+
+
+              <Route path="/product/:id" element={<ProductDetail />} />
 
 
             </Routes>

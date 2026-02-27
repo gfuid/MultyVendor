@@ -15,6 +15,10 @@ const { connectRedis } = require('./config/redis');
 const vendorRoutes = require('./routes/vendorRoutes');
 const productRoutes = require('./routes/productRoutes');
 const adminRoutes = require('./routes/adminRoutes'); // Admin routes import karein
+const userRoutes = require('./routes/userRoutes')
+const cartRoutes = require('./routes/cartRoutes')
+const orderRoutes = require('./routes/orderRoutes');
+
 
 const app = express();
 
@@ -38,8 +42,11 @@ mongoose.connect(process.env.MONGO_URI)
 
 // API Routes
 // server.js mein routes ke section mein
-app.use('/api/users', require('./routes/userRoutes'));
-app.use('/api/auth', require('./routes/authRoutes'));
+// cart router for cart manegment 
+app.use('/api/cart', cartRoutes)
+app.use('/api/orders', orderRoutes);
+app.use('/api/users', userRoutes); // Yeh path /api/users/me banayega
+app.use('/api/auth', require('./routes/authRoutes')); // Yeh /api/auth/... banayega
 app.use('/api/vendor', vendorRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/admin', adminRoutes); // Admin API enable karein

@@ -1,32 +1,108 @@
 import React, { useState, useEffect } from 'react';
 import useAuthStore from '../../store/authStore.js';
 import {
-    LayoutDashboard,
-    Package,
-    PlusCircle,
-    ShoppingBag,
-    Users,
-    TrendingUp,
-    Settings,
-    ChevronRight,
-    Store
+    LayoutDashboard, Package, PlusCircle,
+    ShoppingBag, Users, TrendingUp,
+    Settings, Store, ArrowUpRight,
+    Zap, Clock, CheckCircle, XCircle, Truck
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import API from '../../api/axios';
 
+// ─── Status Config ────────────────────────────────────────────
+const STATUS_CONFIG = {
+    processing: { label: 'Processing', dot: '#f59e0b' },
+    shipped: { label: 'Shipped', dot: '#3b82f6' },
+    delivered: { label: 'Delivered', dot: '#10b981' },
+    cancelled: { label: 'Cancelled', dot: '#ef4444' },
+};
+
+// ─── Sidebar Nav Item ─────────────────────────────────────────
+const NavItem = ({ to, icon: Icon, label, active }) => (
+    <Link
+        to={to}
+        className={`group flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-sm transition-all duration-200
+            ${active
+                ? 'bg-[#ff4d6d] text-white shadow-lg shadow-pink-200'
+                : 'text-gray-400 hover:text-gray-800 hover:bg-gray-50'
+            }`}
+    >
+        <Icon size={18} strokeWidth={active ? 2.5 : 2} />
+        <span className="tracking-tight">{label}</span>
+        {active && <ArrowUpRight size={14} className="ml-auto opacity-70" />}
+    </Link>
+);
+
+// ─── Stat Card ────────────────────────────────────────────────
+const StatCard = ({ label, value, icon: Icon, accent, trend }) => (
+    <div className="relative bg-white rounded-3xl p-6 border border-gray-100 overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+        {/* Background blob */}
+        <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full opacity-[0.07] ${accent}`} />
+
+        <div className="relative z-10">
+            <div className={`inline-flex p-2.5 rounded-2xl mb-4 ${accent} bg-opacity-10`}>
+                <Icon size={20} className={`${accent.replace('bg-', 'text-')}`} />
+            </div>
+            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</p>
+            <h3 className="text-3xl font-black text-gray-900 tracking-tighter">{value}</h3>
+            {trend && (
+                <p className="text-[10px] text-green-500 font-bold mt-1 flex items-center gap-1">
+                    <TrendingUp size={10} /> {trend}
+                </p>
+            )}
+        </div>
+    </div>
+);
+
+// ─── Main Component ───────────────────────────────────────────
 const SellerDashboard = () => {
     const { user } = useAuthStore();
-    const [productsCount, setProductsCount] = useState(0);
+    const location = useLocation();
+    const [orders, setOrders] = useState([]);
+    const [stats, setStats] = useState([]);
+    const [recentOrders, setRecentOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState('all');
 
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                // Fetching real-time product count
-                const response = await API.get('/products/my-products');
-                setProductsCount(response.data.length);
+                const [prodRes, orderRes] = await Promise.all([
+                    API.get('/products/my-products'),
+                    API.get('/orders/seller/dashboard')
+                ]);
+
+                const products = prodRes.data || [];
+                const sellerOrders = orderRes.data.orders || [];
+
+                setOrders(sellerOrders);
+                setRecentOrders(sellerOrders.slice(0, 6));
+
+                const revenue = sellerOrders
+                    .filter(o => o.orderStatus !== 'cancelled')
+                    .reduce((acc, o) => acc + (o.totalAmount || 0), 0);
+                const uniqueCustomers = new Set(sellerOrders.map(o => o.buyer?._id)).size;
+
+                setStats([
+                    {
+                        label: 'Total Products', value: products.length,
+                        icon: Package, accent: 'bg-blue-500', trend: 'In your store'
+                    },
+                    {
+                        label: 'Active Orders', value: sellerOrders.filter(o => o.orderStatus === 'processing' || o.orderStatus === 'shipped').length,
+                        icon: ShoppingBag, accent: 'bg-[#ff4d6d]', trend: 'Needs attention'
+                    },
+                    {
+                        label: 'Customers', value: uniqueCustomers,
+                        icon: Users, accent: 'bg-purple-500', trend: 'Unique buyers'
+                    },
+                    {
+                        label: 'Revenue', value: `₹${revenue.toLocaleString('en-IN')}`,
+                        icon: TrendingUp, accent: 'bg-green-500', trend: 'Excl. cancelled'
+                    },
+                ]);
             } catch (err) {
-                console.error("Fetch failed", err);
+                console.error("Dashboard fetch failed", err);
             } finally {
                 setLoading(false);
             }
@@ -34,122 +110,259 @@ const SellerDashboard = () => {
         fetchDashboardData();
     }, []);
 
-    const stats = [
-        { label: 'Total Products', value: productsCount, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { label: 'Active Orders', value: '0', icon: ShoppingBag, color: 'text-green-600', bg: 'bg-green-50' },
-        { label: 'Total Customers', value: '0', icon: Users, color: 'text-purple-600', bg: 'bg-purple-50' },
-        { label: 'Total Revenue', value: '₹0', icon: TrendingUp, color: 'text-orange-600', bg: 'bg-orange-50' },
-    ];
+    // Order status counts for mini chart
+    const statusCounts = {
+        processing: orders.filter(o => o.orderStatus === 'processing').length,
+        shipped: orders.filter(o => o.orderStatus === 'shipped').length,
+        delivered: orders.filter(o => o.orderStatus === 'delivered').length,
+        cancelled: orders.filter(o => o.orderStatus === 'cancelled').length,
+    };
+
+    const filteredRecent = activeTab === 'all'
+        ? recentOrders
+        : recentOrders.filter(o => o.orderStatus === activeTab);
 
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <p className="text-[#ff4d6d] font-black animate-pulse uppercase tracking-widest">Initialising Biz Center...</p>
+            <div className="text-center space-y-3">
+                <div className="w-10 h-10 border-4 border-[#ff4d6d] border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Loading Dashboard...</p>
+            </div>
         </div>
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 flex">
-            {/* Sidebar with Settings added */}
-            <aside className="w-64 bg-white border-r border-gray-100 hidden lg:block p-6">
-                <h2 className="text-xl font-black text-[#ff4d6d] italic mb-10 uppercase tracking-tighter">Trireme Biz</h2>
-                <nav className="space-y-2">
-                    <Link to="/seller/dashboard" className="flex items-center gap-3 p-3 bg-pink-50 text-[#ff4d6d] rounded-xl font-bold transition-all">
-                        <LayoutDashboard size={20} /> Dashboard
-                    </Link>
-                    <Link to="/seller/add-product" className="flex items-center gap-3 p-3 text-gray-500 hover:bg-gray-50 rounded-xl font-medium transition-all">
-                        <PlusCircle size={20} /> Add Product
-                    </Link>
-                    <Link to="/seller/my-products" className="flex items-center gap-3 p-3 text-gray-500 hover:bg-gray-50 rounded-xl font-medium transition-all">
-                        <Package size={20} /> My Products
-                    </Link>
-                    <Link to="/seller/settings" className="flex items-center gap-3 p-3 text-gray-500 hover:bg-gray-50 rounded-xl font-medium transition-all">
-                        <Settings size={20} /> Store Settings
-                    </Link>
+        <div className="min-h-screen bg-[#f8f8f8] flex">
+
+            {/* ── SIDEBAR ──────────────────────────────────────── */}
+            <aside className="w-64 bg-white border-r border-gray-100 hidden lg:flex flex-col p-5 sticky top-0 h-screen">
+                {/* Logo */}
+                <div className="mb-8 px-2">
+                    <h2 className="text-lg font-black text-[#ff4d6d] italic uppercase tracking-tighter">
+                        Trireme Biz
+                    </h2>
+                    <div className="flex items-center gap-2 mt-2">
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#ff4d6d] to-[#ff7096] flex items-center justify-center text-white text-[10px] font-black">
+                            {user?.name?.[0]?.toUpperCase() || 'S'}
+                        </div>
+                        <div>
+                            <p className="text-xs font-black text-gray-800 truncate max-w-[130px]">
+                                {user?.storeName || user?.name}
+                            </p>
+                            <p className="text-[10px] text-green-500 font-bold flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                                Active Seller
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Nav */}
+                <nav className="space-y-1 flex-1">
+                    <NavItem to="/seller/dashboard" icon={LayoutDashboard} label="Dashboard" active={location.pathname === '/seller/dashboard'} />
+                    <NavItem to="/seller/orders" icon={ShoppingBag} label="Orders" active={location.pathname === '/seller/orders'} />
+                    <NavItem to="/seller/add-product" icon={PlusCircle} label="Add Product" active={location.pathname === '/seller/add-product'} />
+                    <NavItem to="/seller/my-products" icon={Package} label="My Products" active={location.pathname === '/seller/my-products'} />
+                    <NavItem to="/seller/settings" icon={Settings} label="Settings" active={location.pathname === '/seller/settings'} />
                 </nav>
+
+                {/* Quick tip card */}
+                <div className="bg-gradient-to-br from-[#ff4d6d] to-[#c2185b] rounded-2xl p-4 text-white mt-4">
+                    <Zap size={16} className="mb-2 text-yellow-300" />
+                    <p className="text-[11px] font-black uppercase tracking-wider mb-1">Pro Tip</p>
+                    <p className="text-[11px] text-pink-100 leading-relaxed">
+                        Ship within 24hrs to boost your seller rating by 20%.
+                    </p>
+                </div>
             </aside>
 
-            {/* Main Content */}
-            <main className="flex-1 p-4 md:p-8 overflow-y-auto">
-                <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* ── MAIN CONTENT ─────────────────────────────────── */}
+            <main className="flex-1 p-5 md:p-8 overflow-y-auto min-h-screen">
+
+                {/* Header */}
+                <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                     <div>
-                        <h1 className="text-3xl font-black text-gray-900 uppercase italic tracking-tighter">Control Center</h1>
-                        <p className="text-gray-500 font-medium flex items-center gap-2">
-                            <Store size={16} className="text-[#ff4d6d]" />
-                            Store: <span className="text-gray-800 font-bold">{user?.storeName || user?.name}</span>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">
+                            Welcome back
                         </p>
+                        <h1 className="text-3xl font-black text-gray-900 uppercase italic tracking-tighter">
+                            {user?.storeName || user?.name}'s Store
+                        </h1>
                     </div>
                     <div className="flex gap-3">
                         <Link
-                            to="/seller/settings"
-                            className="bg-white text-gray-700 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 border border-gray-200 hover:bg-gray-50 transition-all"
+                            to="/seller/add-product"
+                            className="bg-[#ff4d6d] text-white px-5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center gap-2 hover:bg-[#e03458] transition-colors shadow-lg shadow-pink-200"
                         >
-                            <Settings size={20} />
+                            <PlusCircle size={16} /> Add Product
                         </Link>
                         <Link
-                            to="/seller/add-product"
-                            className="bg-[#ff4d6d] text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#ff7096] transition-all shadow-lg shadow-pink-100"
+                            to="/seller/orders"
+                            className="bg-white text-gray-700 px-5 py-2.5 rounded-2xl font-bold text-xs border border-gray-200 flex items-center gap-2 hover:bg-gray-50 transition-colors"
                         >
-                            <PlusCircle size={20} /> Add New Product
+                            <ShoppingBag size={16} /> All Orders
                         </Link>
                     </div>
                 </header>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-                    {stats.map((item, index) => (
-                        <div key={index} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-all">
-                            <div className={`p-4 ${item.bg} ${item.color} rounded-2xl`}>
-                                <item.icon size={24} />
-                            </div>
-                            <div>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{item.label}</p>
-                                <h3 className="text-2xl font-black text-gray-800">{item.value}</h3>
-                            </div>
-                        </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    {stats.map((item, i) => (
+                        <StatCard key={i} {...item} />
                     ))}
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Activity Feed / Placeholder */}
-                    <div className="lg:col-span-2 space-y-8">
-                        {productsCount === 0 ? (
-                            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 text-center py-20">
-                                <div className="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <Package size={40} className="text-gray-300" />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                    {/* ── RECENT ORDERS (2/3 width) ─────────────── */}
+                    <div className="lg:col-span-2 bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+                            <h2 className="font-black text-gray-900 uppercase italic tracking-tighter text-base">
+                                Recent Orders
+                            </h2>
+                            <Link
+                                to="/seller/orders"
+                                className="text-[10px] font-black text-[#ff4d6d] uppercase tracking-widest hover:underline flex items-center gap-1"
+                            >
+                                See All <ArrowUpRight size={12} />
+                            </Link>
+                        </div>
+
+                        {/* Tab Filter */}
+                        <div className="flex gap-2 px-6 pt-4 pb-2 overflow-x-auto">
+                            {['all', 'processing', 'shipped', 'delivered', 'cancelled'].map(tab => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={`flex-shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all
+                                        ${activeTab === tab
+                                            ? 'bg-gray-900 text-white'
+                                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    {tab === 'all' ? `All (${orders.length})` : `${tab} (${statusCounts[tab]})`}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Orders List */}
+                        <div className="px-6 pb-6 space-y-2 mt-2">
+                            {filteredRecent.length > 0 ? filteredRecent.map((order) => (
+                                <div
+                                    key={order._id}
+                                    className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-2xl border border-gray-100 transition-colors group cursor-pointer"
+                                >
+                                    {/* Left: Image + Info */}
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <img
+                                            src={order.items[0]?.product?.images?.[0] || 'https://via.placeholder.com/40'}
+                                            className="w-10 h-10 rounded-xl object-cover bg-white border border-gray-200 flex-shrink-0"
+                                            alt=""
+                                        />
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-black text-gray-800 tracking-tight truncate">
+                                                {order.buyer?.name || 'Customer'}
+                                            </p>
+                                            <p className="text-[10px] text-gray-400 font-bold">
+                                                #{order._id.slice(-6)} · {order.items.length} item{order.items.length > 1 ? 's' : ''}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Right: Amount + Status */}
+                                    <div className="flex items-center gap-3 flex-shrink-0">
+                                        <p className="font-black text-gray-900 text-sm">₹{order.totalAmount}</p>
+                                        <span
+                                            className="text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-wider border"
+                                            style={{
+                                                color: STATUS_CONFIG[order.orderStatus]?.dot || '#888',
+                                                backgroundColor: STATUS_CONFIG[order.orderStatus]?.dot + '18' || '#f5f5f5',
+                                                borderColor: STATUS_CONFIG[order.orderStatus]?.dot + '33' || '#eee',
+                                            }}
+                                        >
+                                            {STATUS_CONFIG[order.orderStatus]?.label || order.orderStatus}
+                                        </span>
+                                    </div>
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-800">Your Inventory is Empty</h3>
-                                <p className="text-gray-500 mt-2 mb-6 text-sm max-w-xs mx-auto">
-                                    Products add karein taaki aapki shop live ho sake aur customers orders place kar sakein.
-                                </p>
-                                <Link to="/seller/add-product" className="bg-[#ff4d6d]/10 text-[#ff4d6d] px-8 py-3 rounded-full font-bold hover:bg-[#ff4d6d] hover:text-white transition-all inline-block">
-                                    Upload First Product
-                                </Link>
-                            </div>
-                        ) : (
-                            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-lg font-black uppercase italic tracking-tight">Recent Performance</h2>
-                                    <span className="text-xs font-bold text-gray-400 bg-gray-50 px-3 py-1 rounded-full">Last 7 Days</span>
+                            )) : (
+                                <div className="text-center py-12">
+                                    <ShoppingBag size={36} className="text-gray-200 mx-auto mb-3" />
+                                    <p className="text-gray-300 font-black uppercase italic tracking-widest text-sm">
+                                        No orders here
+                                    </p>
                                 </div>
-                                <div className="h-64 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center">
-                                    <TrendingUp size={40} className="text-gray-200 mb-2" />
-                                    <p className="text-gray-400 text-sm font-medium italic">Sales graphs will appear as you start receiving orders</p>
-                                </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
 
-                    {/* Quick Actions Sidebar Section */}
-                    <div className="space-y-6">
+                    {/* ── RIGHT COLUMN (1/3 width) ──────────────── */}
+                    <div className="space-y-5">
 
-
-                        {/* Store Tip Card */}
-                        <div className="bg-gradient-to-br from-[#ff4d6d] to-[#ff7096] rounded-3xl p-6 text-white shadow-lg shadow-pink-100">
-                            <h3 className="font-black italic uppercase text-lg mb-2">Seller Tip!</h3>
-                            <p className="text-sm text-pink-50 leading-relaxed">
-                                Add clear, high-quality images to your products to increase your sales conversion by 40%.
-                            </p>
+                        {/* Order Breakdown */}
+                        <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
+                            <h3 className="font-black text-gray-900 uppercase italic tracking-tighter text-sm mb-5">
+                                Order Breakdown
+                            </h3>
+                            <div className="space-y-3">
+                                {Object.entries(statusCounts).map(([status, count]) => {
+                                    const cfg = STATUS_CONFIG[status];
+                                    const percent = orders.length ? Math.round((count / orders.length) * 100) : 0;
+                                    return (
+                                        <div key={status}>
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                                    {cfg.label}
+                                                </span>
+                                                <span className="text-[10px] font-black text-gray-800">
+                                                    {count} <span className="text-gray-400">({percent}%)</span>
+                                                </span>
+                                            </div>
+                                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full rounded-full transition-all duration-700"
+                                                    style={{
+                                                        width: `${percent}%`,
+                                                        backgroundColor: cfg.dot
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
+
+                        {/* Quick Actions */}
+                        <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
+                            <h3 className="font-black text-gray-900 uppercase italic tracking-tighter text-sm mb-4">
+                                Quick Actions
+                            </h3>
+                            <div className="space-y-2">
+                                {[
+                                    { to: '/seller/add-product', icon: PlusCircle, label: 'Add New Product', sub: 'List a new item' },
+                                    { to: '/seller/my-products', icon: Package, label: 'Manage Products', sub: 'Edit / delete' },
+                                    { to: '/seller/orders', icon: ShoppingBag, label: 'View All Orders', sub: 'Full order list' },
+                                    { to: '/seller/settings', icon: Settings, label: 'Store Settings', sub: 'Profile & info' },
+                                ].map((action) => (
+                                    <Link
+                                        key={action.to}
+                                        to={action.to}
+                                        className="flex items-center gap-3 p-3 rounded-2xl hover:bg-gray-50 transition-colors group"
+                                    >
+                                        <div className="p-2 bg-gray-100 group-hover:bg-[#ff4d6d] group-hover:text-white text-gray-500 rounded-xl transition-all">
+                                            <action.icon size={14} />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-xs font-black text-gray-800">{action.label}</p>
+                                            <p className="text-[10px] text-gray-400">{action.sub}</p>
+                                        </div>
+                                        <ArrowUpRight size={14} className="text-gray-300 group-hover:text-[#ff4d6d] transition-colors flex-shrink-0" />
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </main>

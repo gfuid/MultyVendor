@@ -49,7 +49,8 @@ exports.registerUser = async (req, res) => {
             email,
             password: hashedPassword,
             // Marketplace status check: Admin ise baad mein approve karega
-            sellerStatus: wantToBeSeller ? 'pending' : 'none',
+            sellerStatus: 'none',
+            isSeller: false
         });
 
         // 4. RESPONSE: User create hone ke baad data aur JWT Token bhej rahe hain
@@ -71,73 +72,52 @@ exports.registerUser = async (req, res) => {
 };
 
 
-
-/**
- * @desc    User ko Authenticate karna aur JWT Token dena
- * @route   POST /api/auth/login
- * @access  Public
- */
+// login users
 exports.loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // 1. DATA VALIDATION: Check karein ki email aur password dono bhejey gaye hain
+        // 1. INPUT VALIDATION: Check karein dono fields hain ya nahi
         if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: 'Please provide both email and password'
-            });
+            return res.status(400).json({ success: false, message: 'Please provide both email and password' });
         }
 
-        // 2. USER SEARCH: Database mein email ke zariye user ko dhundna
-        // Agar model mein password 'select: false' hai, toh .select('+password') use karein
-        const user = await User.findOne({ email });
+        // 2. DATABASE USER SEARCH: Email se user dhundein aur password select karein
+        // Ab yahan Admin, Seller aur User sab database se hi check honge
+        const user = await User.findOne({ email }).select('+password');
 
         if (!user) {
-            // SECURITY TIP: Industry standard ke hisaab se hum exact error nahi batate 
-            // taaki hackers ko ye pata na chale ki kaunsa email system mein registered hai.
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid email or password'
-            });
+            return res.status(401).json({ success: false, message: 'Invalid email or password' });
         }
 
-        // 3. PASSWORD VERIFICATION: Entered password aur DB ke hashed password ko compare karna
+        // 3. PASSWORD VERIFICATION: Bcrypt se hash compare karein
         const isMatch = await bcrypt.compare(password, user.password);
-
         if (!isMatch) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid email or password'
-            });
+            return res.status(401).json({ success: false, message: 'Invalid email or password' });
         }
 
-        // 4. SUCCESS RESPONSE: User data aur access token bhej rahe hain
-        // Hum password field ko hata kar baki zaroori details bhejte hain
+        // 4. TOKEN GENERATION: Database ki real ID aur real role use karein
+        const token = generateToken(user._id, user.role);
+
+        // 5. SUCCESS RESPONSE: User data bhejien
         res.status(200).json({
             success: true,
+            token,
             user: {
                 _id: user._id,
                 name: user.name,
                 email: user.email,
-                role: user.role,
+                role: user.role, // "admin", "user", ya "seller"
                 isSeller: user.isSeller,
                 sellerStatus: user.sellerStatus,
-            },
-            // Naya JWT Token generate karke bhej rahe hain
-            token: generateToken(user._id)
+            }
         });
 
     } catch (error) {
-        // Internal errors ko log karna debugging ke liye zaroori hai
         console.error("Login Error:", error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error, please try again later'
-        });
+        res.status(500).json({ success: false, message: 'Server error, please try again later' });
     }
 };
-
 /**
  * @desc    Password reset karne ke liye token generate karna aur link bhejnat
  * @route   POST /api/auth/forgotpassword
@@ -182,7 +162,7 @@ exports.forgotPassword = async (req, res) => {
         // Production mein yahan 'Nodemailer' use karke email bhejna hoga
         res.status(200).json({
             success: true,
-            message: "Mubarak ho! Password reset link generate ho gaya hai.",
+            message: " Password reset link generated ",
             resetUrl // Yeh development phase mein testing ke liye bhej rahe hain
         });
 

@@ -10,37 +10,60 @@ const { redisClient } = require('../config/redis'); // Redis client import
  * @route   POST /api/stores/apply
  * @access  Private (User Only)
  */
-exports.applyForStore = async (req, res) => {
+
+// @desc    Apply for seller account
+exports.applyForSeller = async (req, res) => {
     try {
-        const { storeName, phone, address, category, taxId } = req.body;
+        const data = req.body;
 
-        // FILE HANDLING: Multer relative path generate karta hai local storage ke liye
-        const storeLogo = req.file ? `/uploads/${req.file.filename}` : "";
+        // Validation Check: Pehle check karein ki zaroori fields aa rahi hain ya nahi
+        if (!data.storeName || !data.bankAccount) {
+            return res.status(400).json({ message: "Mandatory fields are missing" });
+        }
 
-        // DB ENTRY: Store collection mein data save karna
-        const store = await Store.create({
-            owner: req.user.id, // Login user ki ID mapping
-            storeName,
-            phone,
-            address,
-            category,
-            taxId,
-            logo: storeLogo
+        const newStore = new Store({
+            owner: req.user._id,
+            businessInfo: {
+                storeName: data.storeName,
+                category: data.category,
+                description: data.description,
+                supportEmail: data.supportEmail,
+                experience: Number(data.experience), // ❌ FIX: String ko Number mein convert karein
+                logo: req.files?.logo ? req.files.logo[0].path : ""
+            },
+            legalInfo: {
+                taxId: data.taxId,
+                panCard: data.panCard,
+                drugLicenseGeneral: data.drug,
+                pharmacySpecific: {
+                    licenseNumber: data.drugLicenseNumber || "",
+                    licenseProof: req.files?.drugLicenseFile ? req.files.drugLicenseFile[0].path : ""
+                }
+            },
+            bankingInfo: {
+                accountHolderName: data.accountHolderName,
+                bankName: data.bankName,
+                branchName: data.branchName,
+                bankAccount: data.bankAccount,
+                accountType: data.accountType,
+                ifscCode: data.ifscCode,
+                phone: data.phone,
+                pickupAddress: data.address // ❌ FIX: Frontend 'address' ko 'pickupAddress' mein map karein
+            }
         });
 
-        // USER UPDATE: User ka status 'pending' karna admin approval ke liye
-        await User.findByIdAndUpdate(req.user.id, { sellerStatus: 'pending' });
+        await newStore.save();
 
-        // REDIS CLEANUP: Purani store lists ya user profile ka cache clear karein
-        await redisClient.del(`user:profile:${req.user.id}`);
-
-        res.status(201).json({
-            success: true,
-            message: "Application submitted successfully! Admin will review it.",
-            store
+        // User Status Update
+        await User.findByIdAndUpdate(req.user._id, {
+            sellerStatus: 'pending',
+            isSeller: false
         });
+
+        res.status(201).json({ success: true, message: "Application submitted!" });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error("Submission Error Details:", error.errors); // Isse detail mein error dikhega
+        res.status(500).json({ message: "Store validation failed: Check all fields" });
     }
 };
 
