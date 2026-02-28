@@ -14,7 +14,7 @@ const fileFilter = (req, file, cb) => {
         cb(null, true); // Sab sahi hai, aage badho
     } else {
         // Error throw karein agar file image nahi hai
-        cb(new Error('Sirf images (jpg, png, webp) allow hain!'), false);
+        cb(new Error('only this format images (jpg, png, webp) allow '), false);
     }
 };
 

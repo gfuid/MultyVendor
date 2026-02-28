@@ -4,7 +4,7 @@ import {
     LayoutDashboard, Package, PlusCircle,
     ShoppingBag, Users, TrendingUp,
     Settings, Store, ArrowUpRight,
-    Zap, Clock, CheckCircle, XCircle, Truck
+    Zap, Clock, CheckCircle, XCircle
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import API from '../../api/axios';

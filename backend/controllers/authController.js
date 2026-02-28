@@ -129,7 +129,7 @@ exports.forgotPassword = async (req, res) => {
         const user = await User.findOne({ email: req.body.email });
 
         if (!user) {
-            return res.status(404).json({ message: "Is email se koi user nahi mila" });
+            return res.status(404).json({ message: "email not found" });
         }
 
         // 2. TOKEN GENERATION: Ek random 20-byte ka string (hex format mein) generate karna

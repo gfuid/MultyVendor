@@ -14,7 +14,7 @@ const Profile = () => {
                 const response = await API.get('/users/me');
                 login(response.data, localStorage.getItem('token'));
             } catch (error) {
-                console.error("Status sync failed", error);
+                console.error("Status sync failed network issues", error);
             }
         };
         fetchLatestStatus();

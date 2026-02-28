@@ -71,8 +71,8 @@ const ProductViewModal = ({ product, onClose, onDelete }) => {
                             <div className="flex items-center justify-between bg-gray-50 rounded-2xl px-4 py-3">
                                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Stock</span>
                                 <span className={`text-sm font-black px-3 py-1 rounded-full ${product.stock > 10 ? 'bg-green-100 text-green-600' :
-                                        product.stock > 0 ? 'bg-yellow-100 text-yellow-600' :
-                                            'bg-red-100 text-red-500'
+                                    product.stock > 0 ? 'bg-yellow-100 text-yellow-600' :
+                                        'bg-red-100 text-red-500'
                                     }`}>
                                     {product.stock > 0 ? `${product.stock} units` : 'Out of Stock'}
                                 </span>
@@ -193,8 +193,8 @@ const ProductRow = ({ product, onView, onDelete }) => (
         <td className="p-4 text-center font-black text-gray-900">₹{product.price}</td>
         <td className="p-4 text-center">
             <span className={`text-xs font-black px-3 py-1 rounded-full ${product.stock > 10 ? 'bg-green-100 text-green-600' :
-                    product.stock > 0 ? 'bg-yellow-100 text-yellow-600' :
-                        'bg-red-100 text-red-500'
+                product.stock > 0 ? 'bg-yellow-100 text-yellow-600' :
+                    'bg-red-100 text-red-500'
                 }`}>
                 {product.stock > 0 ? `${product.stock} units` : 'Out of Stock'}
             </span>
@@ -239,7 +239,7 @@ const MyProducts = () => {
                 const res = await API.get('/products/my-products');
                 setProducts(res.data || []);
             } catch (err) {
-                toast.error('Products load nahi ho paye!');
+                toast.error('Products loaded failed!');
             } finally {
                 setLoading(false);
             }
@@ -265,15 +265,15 @@ const MyProducts = () => {
     }, [products, searchTerm, filterCategory]);
 
     const deleteHandler = async (id) => {
-        if (!window.confirm('Pakka delete karna hai?')) return;
+        if (!window.confirm('sure delete the product?')) return;
         const toastId = toast.loading('Deleting...');
         try {
             await API.delete(`/products/${id}`);
             setProducts(prev => prev.filter(p => p._id !== id));
             if (selectedProduct?._id === id) setSelectedProduct(null);
-            toast.success('Product delete ho gaya!', { id: toastId });
+            toast.success('Product deleted successfully!', { id: toastId });
         } catch (err) {
-            toast.error('Delete fail ho gaya.', { id: toastId });
+            toast.error('Delete failed.', { id: toastId });
         }
     };
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Package, IndianRupee, Tag, AlignLeft, Image as ImageIcon, Plus, X, ArrowRight } from 'lucide-react';
+import { Package, IndianRupee, Tag, Image as ImageIcon, Plus, X, ArrowRight } from 'lucide-react';
 import API from '../../api/axios';
 import toast from 'react-hot-toast';
 
@@ -14,7 +14,7 @@ const AddProduct = () => {
 
         // Check if total images (existing + new) exceed 5
         if (images.length + files.length > 5) {
-            toast.error("Bhai, maximum 5 images allowed hain!");
+            toast.error(" maximum 5 images allowed!");
             return;
         }
 
@@ -37,7 +37,7 @@ const AddProduct = () => {
 
     const onSubmit = async (data) => {
         if (images.length === 0) {
-            toast.error("Kam se kam ek image toh dalo!");
+            toast.error("Atleast one image required!");
             return;
         }
 

@@ -28,7 +28,7 @@ const ProductDetail = () => {
                 setLoading(false);
                 window.scrollTo(0, 0); // Page top par scroll karein
             } catch (err) {
-                toast.error("Product details nahi mil payi");
+                toast.error("Product details are not found");
                 setLoading(false);
             }
         };

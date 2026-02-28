@@ -106,7 +106,7 @@ const adminDeleteProduct = async (req, res) => {
         // ⚠️ CACHE SYNC: Agli baar Admin ko updated list dikhni chahiye
         await clearAdminCache('admin:products');
 
-        res.status(200).json({ message: "Admin ne product remove kar diya" });
+        res.status(200).json({ message: "Admin has removed the product" });
     } catch (error) {
         res.status(500).json({ message: "Deletion error", error: error.message });
     }
@@ -124,7 +124,7 @@ const approveStore = async (req, res) => {
 
         // 1. Store collection mein status 'approved' karna
         const store = await Store.findByIdAndUpdate(storeId, { status: 'approved' }, { new: true });
-        if (!store) return res.status(404).json({ message: "Store record nahi mila" });
+        if (!store) return res.status(404).json({ message: "Store record not found" });
 
         // 2. USER UPDATE: User model mein seller flag true karna
         // Taaki user Vendor Dashboard access kar sake
@@ -138,7 +138,7 @@ const approveStore = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: "Mubarak ho! Store aur User dono approve ho gaye hain."
+            message: " Store and User both approved successfully."
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -167,7 +167,7 @@ const getDashboardStats = async (req, res) => {
             totalRevenue: "₹0" // Sales logic integrate hone par update hoga
         });
     } catch (error) {
-        res.status(500).json({ message: "Stats fetch fail ho gaye" });
+        res.status(500).json({ message: "Stats fetch failed " });
     }
 };
 
@@ -189,16 +189,16 @@ const deleteUser = async (req, res) => {
 
         // Check karein ki admin khud ko delete na kar le (Safety Check)
         if (req.user.id === id) {
-            return res.status(400).json({ message: "Aap khud ko delete nahi kar sakte!" });
+            return res.status(400).json({ message: "You cannot delete yourself" });
         }
 
         const user = await User.findByIdAndDelete(id);
 
         if (!user) {
-            return res.status(404).json({ message: "User nahi mila" });
+            return res.status(404).json({ message: "User not found" });
         }
 
-        res.status(200).json({ success: true, message: "User permanently deleteled" });
+        res.status(200).json({ success: true, message: "User permanently deleted" });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

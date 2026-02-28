@@ -22,7 +22,7 @@ const EditProduct = () => {
                 setValue('description', data.description);
                 setLoading(false);
             } catch (err) {
-                toast.error("Product fetch karne mein galti hui");
+                toast.error("Product fetch failed!");
                 navigate('/seller/my-products');
             }
         };
@@ -35,7 +35,7 @@ const EditProduct = () => {
             toast.success("Product update ho gaya!");
             navigate('/seller/my-products');
         } catch (err) {
-            toast.error("Update fail ho gaya");
+            toast.error("Update failed ");
         }
     };
 

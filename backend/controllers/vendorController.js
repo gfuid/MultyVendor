@@ -90,7 +90,7 @@ exports.getStoreDetails = async (req, res) => {
         const store = await Store.findOne({ owner: req.user.id });
 
         if (!store) {
-            return res.status(404).json({ message: "Store details nahi mili" });
+            return res.status(404).json({ message: "Store details not found!" });
         }
 
         // 3. REDIS SET: Agli baar ke liye cache mein save karein (1 ghante ke liye)
@@ -127,7 +127,7 @@ exports.updateStoreSettings = async (req, res) => {
         );
 
         if (!updatedStore) {
-            return res.status(404).json({ message: "Store record nahi mila" });
+            return res.status(404).json({ message: "Store record not found!" });
         }
 
         // CACHE INVALIDATION: Data badal gaya hai, isliye purana cache delete karein

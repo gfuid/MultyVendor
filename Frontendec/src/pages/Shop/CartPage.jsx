@@ -34,7 +34,7 @@ const CartPage = () => {
             setCart(data);
             if (updateCart) updateCart(data);
         } catch (err) {
-            toast.error("Cart load nahi hua!");
+            toast.error("Cart are not loaded!");
         } finally {
             setLoading(false);
         }
@@ -61,7 +61,7 @@ const CartPage = () => {
             const { data } = await API.put('/cart/update', { productId, action: 'delete' });
             setCart(data.cart);
             if (updateCart) updateCart(data.cart);
-            toast.success("Item hata diya!");
+            toast.success("Item are removed!");
         } catch (err) {
             toast.error("Remove fail!");
         }
@@ -71,7 +71,7 @@ const CartPage = () => {
     const handleProceedToCheckout = () => {
         const { phone, houseNo, street, city, pincode } = addressData;
         if (!phone || !houseNo || !street || !city || !pincode) {
-            return toast.error("Pehle saare delivery details bhariye!");
+            return toast.error("frist fill the all delivery details!");
         }
         // Cart aur address data checkout page pe bhej rahe hain
         navigate('/checkout', {

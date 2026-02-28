@@ -1,164 +1,193 @@
+// ============================================================
+// productController.js — Redis Caching ke saath
+// Har function mein pehle Redis check hota hai, phir MongoDB
+// ============================================================
 const Product = require('../models/Product');
-const cloudinary = require('cloudinary').v2; // Cloudinary ko import karein
+const cloudinary = require('cloudinary').v2;
+const { redisClient } = require('../config/redis');
+// Cache kitni der tak rahegi — 5 minute
+const CACHE_TTL = 300;
 
-/**
- * ============================================================
- * 1. ADD NEW PRODUCT (Naya Maal List Karein)
- * ============================================================
- * @desc    Cloudinary par images upload karke DB mein entry karna
- * @access  Private (Sirf Seller/Vendor ke liye)
- */
+// ============================================================
+// 1. NAYA PRODUCT ADD KARO
+// POST /api/products
+// ============================================================
 exports.addProduct = async (req, res) => {
     try {
-        // IMAGE VALIDATION: Business logic - Bina photo ke product nahi bikta!
-        // req.files tab aata hai jab uploadMiddleware.array() use hota hai
-        if (!req.files || req.files.length === 0) {
-            return res.status(400).json({ message: "Kam se kam ek image dalo bhai!" });
-        }
+        // Bina image ke product nahi banega
+        if (!req.files || req.files.length === 0)
+            return res.status(400).json({ message: "At least one product image is required." });
 
-        // CLOUDINARY EXTRACTION: Multer-Cloudinary storage se milne wale secure URLs nikalna
-        // imagePaths mein array of strings (URLs) store honge
+        // Cloudinary se image URLs nikalo
         const imagePaths = req.files.map(file => file.path);
 
-        // DATA CLEANING: Frontend se string aata hai, use calculation ke liye Number mein badalna zaroori hai
-        const productData = {
+        // MongoDB mein product save karo
+        const product = await Product.create({
             name: req.body.name,
             description: req.body.description,
             price: Number(req.body.price),
             category: req.body.category,
             stock: Number(req.body.stock),
-            seller: req.user.id, // Auth middleware se mili hui Seller ID
+            seller: req.user.id, // Auth middleware se seller ID milti hai
             images: imagePaths
-        };
+        });
 
-        // DB SAVING: Product ko database mein finalize karna
-        const product = await Product.create(productData);
+        // Naya product aaya toh purana cache stale ho gaya — delete karo
+        await redisClient.del('all_products');
+        await redisClient.del(`seller_products:${req.user.id}`);
 
         res.status(201).json({
             success: true,
-            message: "Mubarak ho! Product Cloudinary aur DB mein add ho gaya.",
+            message: "Product added successfully.",
             product
         });
     } catch (error) {
-        // ERROR LOGGING: Server logs check karne ke liye detailed message
-        console.error("Upload Error Details:", error);
-        res.status(500).json({
-            success: false,
-            message: "Server Error: Product add nahi ho paya",
-            error: error.message
-        });
+        console.error("Product Upload Error:", error);
+        res.status(500).json({ success: false, message: "Failed to add product. Please try again." });
     }
 };
 
-/**
- * ============================================================
- * 2. GET VENDOR PRODUCTS (Seller ka Apna Stock)
- * ============================================================
- * @desc    Sirf logged-in seller ke products fetch karna
- */
-exports.getVendorProducts = async (req, res) => {
+// ============================================================
+// 2. SAARE PRODUCTS FETCH KARO (Public)
+// GET /api/products
+// ============================================================
+exports.getAllProducts = async (req, res) => {
     try {
-        // FILTER LOGIC: MongoDB search query jo sirf logged-in user ki ID match kare
-        const products = await Product.find({ seller: req.user.id });
-        res.status(200).json(products);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-/**
- * ============================================================
- * 3. DELETE PRODUCT (Stock se Maal Hatayein)
- * ============================================================
- * @desc    Database entry aur (Local/Cloud) images ko clean karna
- */
-exports.deleteProduct = async (req, res) => {
-    try {
-        const product = await Product.findById(req.params.id);
-        if (!product) return res.status(404).json({ message: "Product nahi mila" });
-
-        if (product.seller.toString() !== req.user.id) {
-            return res.status(401).json({ message: "Not Authorized" });
+        // Pehle Redis mein dhundo — agar mila toh database hit karne ki zaroorat nahi
+        const cached = await redisClient.get('all_products');
+        if (cached) {
+            console.log('⚡ Serving All Products from Redis');
+            return res.status(200).json(JSON.parse(cached));
         }
 
-        // CLOUDINARY CLEANUP: Cloud se images hatana
-        const deletePromises = product.images.map(url => {
-            // URL se Public ID nikalna (e.g., 'trireme/product_id')
-            const publicId = url.split('/').pop().split('.')[0];
-            return cloudinary.uploader.destroy(publicId);
-        });
-        await Promise.all(deletePromises);
+        // Redis mein nahi mila toh MongoDB se lo
+        const products = await Product.find({}).populate('seller', 'businessInfo.storeName');
 
-        await product.deleteOne();
-        res.status(200).json({ success: true, message: "Product and Images removed!" });
+        // Agla baar ke liye Redis mein store karo
+        await redisClient.setEx('all_products', CACHE_TTL, JSON.stringify(products));
+
+        res.status(200).json(products);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: "Failed to fetch products. Please try again." });
     }
 };
 
-/**
- * ============================================================
- * 4. GET PRODUCT BY ID (Detail View)
- * ============================================================
- * @desc    Kisi ek specific product ki poori detail nikalna
- */
+// ============================================================
+// 3. EK PRODUCT KI DETAIL (ID se)
+// GET /api/products/:id
+// ============================================================
 exports.getProductById = async (req, res) => {
     try {
+        // Har product ka alag cache key — taaki individual update possible ho
+        const cacheKey = `product:${req.params.id}`;
+
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            console.log(`⚡ Product ${req.params.id} served from Redis`);
+            return res.status(200).json(JSON.parse(cached));
+        }
+
         const product = await Product.findById(req.params.id);
-        if (!product) return res.status(404).json({ message: "Product missing hai" });
+        if (!product)
+            return res.status(404).json({ message: "Product not found." });
+
+        // Cache mein daal do agla request ke liye
+        await redisClient.setEx(cacheKey, CACHE_TTL, JSON.stringify(product));
+
         res.status(200).json(product);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: "Failed to fetch product details." });
     }
 };
 
-/**
- * ============================================================
- * 5. UPDATE PRODUCT (Details Edit Karein)
- * ============================================================
- * @desc    Price, Stock ya Description mein badlav karna
- */
+// ============================================================
+// 4. SELLER KE APNE PRODUCTS
+// GET /api/products/vendor
+// ============================================================
+exports.getVendorProducts = async (req, res) => {
+    try {
+        // Seller ka personal cache — sirf unke products
+        const cacheKey = `seller_products:${req.user.id}`;
+
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            console.log(`⚡ Seller products served from Redis`);
+            return res.status(200).json(JSON.parse(cached));
+        }
+
+        // Database se seller ki ID match karke products lo
+        const products = await Product.find({ seller: req.user.id });
+        await redisClient.setEx(cacheKey, CACHE_TTL, JSON.stringify(products));
+
+        res.status(200).json(products);
+    } catch (error) {
+        res.status(500).json({ message: "Failed to fetch your products." });
+    }
+};
+
+// ============================================================
+// 5. PRODUCT UPDATE KARO
+// PUT /api/products/:id
+// ============================================================
 exports.updateProduct = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
-        if (!product) return res.status(404).json({ message: "Product not get" });
 
-        // ✅ Ownership Check Add Karein
-        if (product.seller.toString() !== req.user.id) {
-            return res.status(401).json({ message: "This Product is not user" });
-        }
+        // Product exist karta hai ya nahi
+        if (!product)
+            return res.status(404).json({ message: "Product not found." });
+
+        // Sirf apna product update kar sakta hai seller
+        if (product.seller.toString() !== req.user.id)
+            return res.status(403).json({ message: "You are not authorized to update this product." });
 
         const updatedProduct = await Product.findByIdAndUpdate(
             req.params.id,
             req.body,
             { new: true, runValidators: true }
         );
+
+        // Product badla toh teeno related caches hata do
+        await redisClient.del(`product:${req.params.id}`);
+        await redisClient.del('all_products');
+        await redisClient.del(`seller_products:${req.user.id}`);
+
         res.status(200).json({ success: true, product: updatedProduct });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: "Failed to update product." });
     }
 };
 
-
-// backend/controllers/productController.js
-exports.getAllProducts = async (req, res) => {
-    try {
-        // .populate('seller') se aapko vendor ka naam dikhane mein madad milegi
-        const products = await Product.find({}).populate('seller', 'businessInfo.storeName');
-        res.status(200).json(products);
-    } catch (error) {
-        res.status(500).json({ message: "Marketplace fetch error" });
-    }
-};
-
-// backend/controllers/productController.js
-exports.getProductById = async (req, res) => {
+// ============================================================
+// 6. PRODUCT DELETE KARO
+// DELETE /api/products/:id
+// ============================================================
+exports.deleteProduct = async (req, res) => {
     try {
         const product = await Product.findById(req.params.id);
-        if (!product) return res.status(404).json({ message: "Product not get" });
-        res.status(200).json(product);
+
+        if (!product)
+            return res.status(404).json({ message: "Product not found." });
+
+        // Ownership check — dusre ka product delete nahi kar sakte
+        if (product.seller.toString() !== req.user.id)
+            return res.status(403).json({ message: "You are not authorized to delete this product." });
+
+        // Cloudinary se bhi images hata do — storage waste na ho
+        const deletePromises = product.images.map(url => {
+            const publicId = url.split('/').pop().split('.')[0];
+            return cloudinary.uploader.destroy(publicId);
+        });
+        await Promise.all(deletePromises);
+        await product.deleteOne();
+
+        // Database se hata diya toh cache bhi stale hai — clear karo
+        await redisClient.del(`product:${req.params.id}`);
+        await redisClient.del('all_products');
+        await redisClient.del(`seller_products:${req.user.id}`);
+
+        res.status(200).json({ success: true, message: "Product deleted successfully." });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: "Failed to delete product." });
     }
 };
-

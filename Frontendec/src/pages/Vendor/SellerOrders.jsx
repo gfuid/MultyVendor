@@ -55,7 +55,7 @@ const SellerOrders = () => {
             const { data } = await API.get('/orders/seller/dashboard');
             setOrders(data.orders || []);
         } catch (err) {
-            toast.error('Orders load nahi huye!');
+            toast.error('Orders load failed!');
         } finally {
             setLoading(false);
         }
@@ -77,7 +77,7 @@ const SellerOrders = () => {
                 setSelectedOrder(prev => ({ ...prev, orderStatus: newStatus }));
             }
         } catch (err) {
-            toast.error('Status update fail! Permission check karo.');
+            toast.error('Status update fail! Check the permission.');
         } finally {
             setUpdatingId(null);
         }
@@ -342,7 +342,7 @@ const SellerOrders = () => {
                                     <div className="flex justify-between">
                                         <span className="text-xs text-gray-500 font-bold">Status</span>
                                         <span className={`text-xs font-black uppercase ${selectedOrder.paymentStatus === 'Completed' ? 'text-green-600' :
-                                                selectedOrder.paymentStatus === 'Cancelled' ? 'text-red-500' : 'text-yellow-600'
+                                            selectedOrder.paymentStatus === 'Cancelled' ? 'text-red-500' : 'text-yellow-600'
                                             }`}>
                                             {selectedOrder.paymentStatus}
                                         </span>

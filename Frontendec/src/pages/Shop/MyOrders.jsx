@@ -26,10 +26,10 @@ const MyOrders = () => {
     const handleInvoice = (order) => {
         try {
             generateInvoice(order);
-            toast.success('Invoice download ho rahi hai!');
+            toast.success('Invoice downloaded please wait!');
         } catch (e) {
             console.error(e);
-            toast.error('Invoice generate nahi hui!');
+            toast.error('Invoice are not generate ');
         }
     };
 

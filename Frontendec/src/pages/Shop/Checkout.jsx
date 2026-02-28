@@ -55,7 +55,7 @@ const Checkout = () => {
                 navigate('/orders');
             }
         } catch (err) {
-            toast.error("Order fail ho gaya! Try again.", { id: orderToast });
+            toast.error("Order failed! Try again.", { id: orderToast });
         }
     };
 

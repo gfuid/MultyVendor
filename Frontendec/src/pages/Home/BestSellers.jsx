@@ -31,7 +31,7 @@ const BestSellers = () => {
     // 2. Add to Cart Logic
     const handleAddToCart = async (product) => {
         if (!user) {
-            toast.error("Pehle login to kar lo bhai!");
+            toast.error("frist login then add to cart");
             return navigate('/login');
         }
 

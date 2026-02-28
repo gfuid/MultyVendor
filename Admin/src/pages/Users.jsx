@@ -23,7 +23,7 @@ const Users = () => {
             }
         } catch (error) {
             console.error("API Error Details:", error.response);
-            toast.error("Data load nahi ho pa raha");
+            toast.error("Data loaded are failed! Please try again.");
         } finally {
             setLoading(false);
         }

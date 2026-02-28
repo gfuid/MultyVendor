@@ -1,27 +1,66 @@
 const mongoose = require('mongoose');
 
-// models/Order.js
 const orderSchema = new mongoose.Schema({
-    buyer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+
+    buyer: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
+
     items: [{
-        product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-        seller: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Filter isi se hoga
-        quantity: { type: Number, required: true },
-        price: { type: Number, required: true }
+        product: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Product',
+            required: true
+        },
+        seller: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true
+        },
+        quantity: {
+            type: Number,
+            required: true
+        },
+        price: {
+            type: Number,
+            required: true
+        }
     }],
-    shippingAddress: { type: String, required: true }, // 🔥 Yeh add karein
-    totalAmount: { type: Number, required: true },
-    paymentStatus: { type: String, default: 'pending' },
-    orderStatus: { type: String, default: 'processing' },
-    // models/Order.js mein ye field zaroor honi chahiye
+
     shippingAddress: {
         type: String,
         required: true
     },
+
+    totalAmount: {
+        type: Number,
+        required: true
+    },
+
+    paymentStatus: {
+        type: String,
+        default: 'pending'
+    },
+
+    paymentMethod: {
+        type: String
+    },
+
+    razorpayOrderId: {
+        type: String
+    },
+
+    razorpayPaymentId: {
+        type: String
+    },
+
+    orderStatus: {
+        type: String,
+        default: 'processing'
+    }
+
 }, { timestamps: true });
 
-
-
 module.exports = mongoose.model('Order', orderSchema);
-
-

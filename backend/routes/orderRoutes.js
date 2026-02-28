@@ -8,7 +8,8 @@ const {
     updateOrderStatus,
     getAllOrders,
     getSellerOrders,
-    createRazorpayOrder
+    createRazorpayOrder,
+    verifyPayment
 } = require('../controllers/orderController');
 
 const { protect, admin } = require('../middleware/authMiddleware');
@@ -38,5 +39,9 @@ router.get('/:id', protect, getOrderById);
 
 // PUT /api/orders/:id/status — Admin: Order status update
 router.put('/:id/status', protect, updateOrderStatus);
+
+
+
+router.post('/verify-payment', protect, verifyPayment);
 
 module.exports = router;
