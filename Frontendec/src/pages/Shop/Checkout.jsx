@@ -30,33 +30,100 @@ const Checkout = () => {
     }
 
     const subtotal = totalBill || 0;
-    // UPI discount only if Online payment selected
+    // UPI discount only if Online payment select   ed
     const upiDiscount = paymentMethod === 'Online' ? 20 : 0;
     const total = subtotal - upiDiscount;
 
     const handlePlaceOrder = async () => {
-        const orderToast = toast.loading("Order place ho raha hai...");
-        try {
-            const fullAddress = `${addressData.houseNo}, ${addressData.street}, ${addressData.city} - ${addressData.pincode} (Mob: ${addressData.phone})`;
 
-            const { data } = await API.post('/orders', {
+        if (paymentMethod === "COD") {
+
+            // COD existing flow
+
+            const fullAddress = `${addressData.houseNo}, ${addressData.street}, ${addressData.city}`;
+
+            const { data } = await API.post("/orders", {
+
                 shippingAddress: fullAddress,
-                paymentMethod: paymentMethod === 'COD' ? 'COD' : 'Online',
-                paymentStatus: paymentMethod === 'COD' ? 'pending' : 'paid'
+                paymentMethod: "COD",
+                paymentStatus: "pending"
+
             });
 
             if (data.success) {
-                toast.success("Order Successfully Placed! 🚀", { id: orderToast });
 
-                // Global cart store empty karo
-                if (updateCart) updateCart({ items: [] });
+                toast.success("Order placed");
 
-                // Orders page pe redirect karo
-                navigate('/orders');
+                updateCart({ items: [] });
+
+                navigate("/orders");
+
             }
-        } catch (err) {
-            toast.error("Order failed! Try again.", { id: orderToast });
+
+            return;
         }
+
+
+        // ONLINE PAYMENT FLOW
+
+
+        // 1. create razorpay order
+
+        const { data } = await API.post("/orders/razorpay", {
+            amount: total
+        });
+
+
+        const razorOrder = data.razorOrder;
+
+
+        // 2. load razorpay
+
+        const options = {
+
+            key: import.meta.env.VITE_RAZORPAY_KEY,
+
+            amount: razorOrder.amount,
+
+            currency: "INR",
+
+            order_id: razorOrder.id,
+
+
+            handler: async function (response) {
+
+                const fullAddress = `${addressData.houseNo}, ${addressData.street}, ${addressData.city}`;
+
+                // verify payment
+
+                const verifyRes = await API.post(
+                    "/orders/verify-payment",
+                    {
+                        ...response,
+                        shippingAddress: fullAddress
+                    }
+                );
+
+
+                if (verifyRes.data.success) {
+
+                    toast.success("Payment successful");
+
+                    updateCart({ items: [] });
+
+                    navigate("/orders");
+
+                }
+
+            }
+
+        };
+
+
+        const rzp = new window.Razorpay(options);
+
+        rzp.open();
+
     };
 
     return (
